@@ -3,16 +3,16 @@ Responsibility:
 - initialize hono app, middleware, infra-wiring 
 */
 
-import { createFactory } from "hono/factory";
+import { OpenAPIHono } from "@hono/zod-openapi";
 
-// TODO: move to a separate types file
-type Env = {
-   Variables: {
-      MY_VARIABLE: string
-   }
-} 
+const app = new OpenAPIHono();
 
-export const factory = createFactory<Env>()
-const app = factory.createApp()
+app.doc("/doc", {
+	openapi: "3.0.0",
+	info: {
+		title: "Ticketing Management API",
+		version: "0.1.0",
+	},
+});
 
 export default app;
