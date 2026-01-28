@@ -1,0 +1,4 @@
+/*
+Responsibility:
+- Repository contracts (abstractions).
+*/

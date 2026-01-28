@@ -2,15 +2,7 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { createFactory } from 'hono/factory'
 import type { HonoOptions } from 'hono/hono-base'
-
-type Env = {
-   Variables: {
-      MY_VARIABLE: string
-   }
-} 
-
-const factory = createFactory<Env>()
-const app = factory.createApp()
+import app from './lib/server.js'
 
 app.get('/', (c) => {
   return c.text('Hello Hono!')
