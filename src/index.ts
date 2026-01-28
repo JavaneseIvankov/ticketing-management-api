@@ -1,8 +1,5 @@
 import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
-import { createFactory } from 'hono/factory'
-import type { HonoOptions } from 'hono/hono-base'
-import app from './lib/server.js'
+import app from './http/app.js'
 
 app.get('/', (c) => {
   return c.text('Hello Hono!')
