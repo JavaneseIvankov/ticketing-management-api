@@ -1,5 +1,6 @@
-import { serve } from '@hono/node-server'
-import app from './http/app.js'
+import { serve } from "@hono/node-server";
+import app from "./http/app.js";
+import "./handler/index.js";
 
 app.get('/', (c) => {
   return c.text('Hello Hono!')
