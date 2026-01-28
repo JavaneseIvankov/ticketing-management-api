@@ -32,7 +32,14 @@
             node2nix
             nodejs
             nodePackages.pnpm
+            biome
+            direnv
+            nix-direnv
           ];
+
+          shellHook = ''
+              export BIOME_BINARY="${pkgs.biome}/bin/biome"
+          '';
         };
       });
     };
