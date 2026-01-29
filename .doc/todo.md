@@ -1,7 +1,4 @@
 # Backlog
-- get db up and running
-   - setup drizzle + neon (no self-deployed infra for first iter) 
-- add healthcheck endpoint
 
 - create use-case implementations (builders)
 
@@ -12,6 +9,9 @@
 - map domain to http error
 
 # Doing
+- get db up and running
+   - setup drizzle + neon (no self-deployed infra for first iter) 
+- add healthcheck endpoint
 
 
 # Done
