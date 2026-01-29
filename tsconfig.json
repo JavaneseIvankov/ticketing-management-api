@@ -5,7 +5,7 @@
     "strict": true,
     "incremental": true,
     "verbatimModuleSyntax": true,
-    "isolatedModules": true,
+    "isolatedModules": false,
     "skipLibCheck": true,
     "types": [
       "node"
