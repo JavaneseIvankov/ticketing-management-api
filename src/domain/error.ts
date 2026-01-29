@@ -7,7 +7,8 @@ export type DomainError =
 	| ReservationExpired
 	| ReservationCancelled
 	| DuplicateRequest
-	| InvalidState;
+	| InvalidState
+	| UserAlreadyExists;
 
 type TaggedError<T extends string, Ext extends Record<string, unknown>> = {
 	_tag: T;
@@ -59,3 +60,11 @@ export type InvalidState = TaggedError<
 		actual?: string;
 	}
 >;
+
+export type UserAlreadyExists = TaggedError<
+	"UserAlreadyExists",
+	{ email: string }
+>;
+
+export type UserNotFound<E extends { email: string } | { userId: string }> =
+	TaggedError<"UserNotFound", E>;
