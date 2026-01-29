@@ -29,6 +29,6 @@ const initEnv = (logger: ILogger) => {
 	}
 };
 
-const env = initEnv(rootLogger);
+const env = initEnv(rootLogger.child({ module: "env" }));
 
 export default env;
