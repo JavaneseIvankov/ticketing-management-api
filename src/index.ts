@@ -13,7 +13,7 @@ app.onError((err, c) => {
 
 serve({
   fetch: app.fetch,
-  port: 3000
+  port: 8000
 }, (info) => {
   console.log(`Server is running on http://localhost:${info.port}`)
 })

@@ -1,4 +1,4 @@
-import type { Logger as PinoLogger } from "pino";
+import { type Logger as PinoLogger, pino } from "pino";
 import type { ILogger } from "./logger.js";
 
 export function createPinoLogger(logger: PinoLogger): ILogger {
@@ -36,3 +36,7 @@ export function createPinoLogger(logger: PinoLogger): ILogger {
 		},
 	};
 }
+
+const rootLogger = createPinoLogger(pino());
+
+export default rootLogger;
