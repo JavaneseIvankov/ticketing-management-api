@@ -116,6 +116,12 @@ dist
 # DynamoDB Local files
 .dynamodb/
 
+# Other db files (data, not schema)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
 # Firebase cache directory
 .firebase/
 
@@ -138,3 +144,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .direnv/
+
+# Keep migrations and metadata
+!drizzle/migrations/**
+!drizzle/meta/**
