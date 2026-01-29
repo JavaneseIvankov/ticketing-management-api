@@ -3,9 +3,6 @@
    - setup drizzle + neon (no self-deployed infra for first iter) 
 - add healthcheck endpoint
 
-- implement ILogger using Pino
-- implement IClock using Date
-- implement IIdempotencyStore using Promise atomic lock
 - create use-case implementations (builders)
 
 - finalize wether we need to model System errors
@@ -15,12 +12,6 @@
 - map domain to http error
 
 # Doing
-- define IEventRepository
-- define IOrderRepository
-- define IUserRepository
-- define ILogger
-- define IClock
-- define IIdempotencyStore
 
 
 # Done
@@ -28,3 +19,12 @@
 - model use-cases types
 - establish project directory structure
 - model domain
+- define IEventRepository
+- define IOrderRepository
+- define IUserRepository
+- define ILogger
+- define IClock
+- define IKeyValueStore
+- implement ILogger using Pino
+- implement IClock using Date
+- implement IKeyValueStore using Promise atomic lock
