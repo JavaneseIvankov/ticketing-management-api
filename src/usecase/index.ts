@@ -9,56 +9,56 @@ Responsibility:
 - idempotency, concurrency control
 */
 
-import type { Result } from "neverthrow";
+import type { ResultAsync } from "neverthrow";
 import type { DomainError } from "../domain/error.js";
 import type { Event, Order, User } from "../domain/model.js";
 
-type UseCase<Input, Output> = (input: Input) => Promise<Output>;
+type UseCase<Input, Output> = (input: Input) => Output;
 
 type UseCaseBuilder<Dependencies, Input, Output> = (
 	deps: Dependencies,
 ) => UseCase<Input, Output>;
 
-type ReserveTicketUseCase = UseCase<
+export type ReserveTicketUseCase = UseCase<
 	{
 		eventId: Event["id"];
 		userId: User["id"];
 	},
 	// FIXME: refine error types
-	Result<{ reservationId: string }, DomainError>
+	ResultAsync<{ reservationId: string }, DomainError>
 >;
 
-type ConfirmReservationUseCase = UseCase<
+export type ConfirmReservationUseCase = UseCase<
 	{
 		reservationId: string;
 	},
 	// FIXME: refine error types
-	Result<void, DomainError>
+	ResultAsync<void, DomainError>
 >;
 
-type CancelReservationUseCase = UseCase<
+export type CancelReservationUseCase = UseCase<
 	{
 		reservationId: string;
 	},
-	Result<void, DomainError>
+	ResultAsync<void, DomainError>
 >;
 
-type GetEventsUseCase = UseCase<void, Result<Event[], DomainError>>;
+export type GetEventsUseCase = UseCase<void, ResultAsync<Event[], DomainError>>;
 
-type GetEventByIdUseCase = UseCase<
+export type GetEventByIdUseCase = UseCase<
 	{
 		eventId: Event["id"];
 	},
 	// FIXME: refine error types
-	Result<Event, DomainError>
+	ResultAsync<Event, DomainError>
 >;
 
-type GetReservations = UseCase<void, Result<Order[], DomainError>>;
+export type GetReservations = UseCase<void, ResultAsync<Order[], DomainError>>;
 
-type GetReservationById = UseCase<
+export type GetReservationById = UseCase<
 	{
 		reservationId: Order["id"];
 	},
 	// FIXME: refine error types
-	Result<Order, DomainError>
+	ResultAsync<Order, DomainError>
 >;
