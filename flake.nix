@@ -35,6 +35,7 @@
             biome
             direnv
             nix-direnv
+            delta
           ];
 
           shellHook = ''

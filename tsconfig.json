@@ -3,7 +3,9 @@
     "target": "ESNext",
     "module": "NodeNext",
     "strict": true,
+    "incremental": true,
     "verbatimModuleSyntax": true,
+    "isolatedModules": true,
     "skipLibCheck": true,
     "types": [
       "node"
