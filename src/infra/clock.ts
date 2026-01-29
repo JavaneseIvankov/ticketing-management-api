@@ -9,3 +9,6 @@ export function createSystemClock(): IClock {
 		},
 	};
 }
+
+const clock = createSystemClock();
+export default clock;
