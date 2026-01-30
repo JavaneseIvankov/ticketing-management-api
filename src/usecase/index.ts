@@ -9,9 +9,15 @@ Responsibility:
 - idempotency, concurrency control
 */
 
-import type { ResultAsync } from "neverthrow";
-import type { ExternalError, PickDomainErrors } from "../domain/error.js";
+import { type Result, err as errResult, ok as okResult } from "neverthrow";
+import err, {
+	type ExternalError,
+	type PickDomainErrors,
+} from "../domain/error.js";
 import type { Event, Order, User } from "../domain/model.js";
+import type { AtomicKeyValueStore } from "../infra/key-value-store.js";
+import type { ILogger } from "../infra/logger.js";
+import type { IOrderRepository, IUserRepository } from "../repo/index.js";
 
 type UseCase<Input, Output> = (input: Input) => Output;
 
@@ -19,12 +25,14 @@ type UseCaseBuilder<Dependencies, Input, Output> = (
 	deps: Dependencies,
 ) => UseCase<Input, Output>;
 
+type Builder<Input, Output> = (deps: Input) => Output;
+
 export type ReserveTicketUseCase = UseCase<
 		{
 			eventId: Event["id"];
 			userId: User["id"];
 		},
-		ResultAsync<{ reservationId: string }, ReserveTicketErrors>
+		Promise<Result<{ reservationId: string }, ReserveTicketErrors>>
 	>;
 
 type ReserveTicketErrors =
@@ -37,11 +45,62 @@ type ReserveTicketErrors =
 	  >
 	| ExternalError;
 
+const buildReserveTicketUseCase: Builder<
+	{
+		userRepo: IUserRepository;
+		orderRepo: IOrderRepository;
+		atomicKVStore: AtomicKeyValueStore<{
+			status: "pending" | "completed";
+			reservationId: string;
+		}>;
+		logger: ILogger;
+		idempotencyKeyGenerator: (
+			input: Parameters<ReserveTicketUseCase>[0],
+		) => string;
+	},
+	ReserveTicketUseCase
+> = (deps) => {
+	return async (params) => {
+		const {
+			atomicKVStore: store,
+			idempotencyKeyGenerator,
+			orderRepo,
+			logger,
+		} = deps;
+		const key = idempotencyKeyGenerator(params);
+		const res = await store.trySet(
+			key,
+			{
+				status: "pending",
+				reservationId: "",
+			},
+			{ ttlMs: 20 * 1000 },
+		); // 20 sec
+		if (!res) return errResult(err.DuplicateRequest({ requestId: key }));
+
+		const orderRes = await orderRepo.createOrder(params.eventId, params.userId);
+
+		if (orderRes.isErr()) {
+			await store.delete(key);
+			return errResult(orderRes.error);
+		}
+
+		await store.set(key, {
+			status: "completed",
+			reservationId: orderRes.value.id,
+		});
+
+		return okResult({
+			reservationId: orderRes.value.id,
+		});
+	};
+};
+
 export type ConfirmReservationUseCase = UseCase<
 		{
 			reservationId: string;
 		},
-		ResultAsync<void, ConfirmReservationErrors>
+		Promise<Result<void, ConfirmReservationErrors>>
 	>;
 
 type ConfirmReservationErrors =
@@ -57,7 +116,7 @@ export type CancelReservationUseCase = UseCase<
 		{
 			reservationId: string;
 		},
-		ResultAsync<void, CancelReservationErrors>
+		Promise<Result<void, CancelReservationErrors>>
 	>;
 
 type CancelReservationErrors =
@@ -65,9 +124,9 @@ type CancelReservationErrors =
 	| ExternalError;
 
 export type GetEventsUseCase = UseCase<
-	void,
-	ResultAsync<Event[], GetEventsErrors>
->;
+		void,
+		Promise<Result<Event[], GetEventsErrors>>
+	>;
 
 type GetEventsErrors = ExternalError;
 
@@ -75,15 +134,15 @@ export type GetEventByIdUseCase = UseCase<
 		{
 			eventId: Event["id"];
 		},
-		ResultAsync<Event, GetEventByIdErrors>
+		Promise<Result<Event, GetEventByIdErrors>>
 	>;
 
 type GetEventByIdErrors = PickDomainErrors<"EventNotFound"> | ExternalError;
 
 export type GetReservations = UseCase<
-	void,
-	ResultAsync<Order[], GetReservationsErrors>
->;
+		void,
+		Promise<Result<Order[], GetReservationsErrors>>
+	>;
 
 type GetReservationsErrors = ExternalError;
 
@@ -91,7 +150,7 @@ export type GetReservationById = UseCase<
 		{
 			reservationId: Order["id"];
 		},
-		ResultAsync<Order, GetReservationByIdErrors>
+		Promise<Result<Order, GetReservationByIdErrors>>
 	>;
 
 type GetReservationByIdErrors =
