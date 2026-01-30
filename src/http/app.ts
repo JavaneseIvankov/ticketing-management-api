@@ -6,6 +6,8 @@ Responsibility:
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { sql } from "drizzle-orm";
 import db from "../infra/db/db.js";
+import rootLogger from "../infra/pino-logger.js";
+import { externalErrorFromCatch } from "../lib/error-lib.js";
 
 const app = new OpenAPIHono();
 
@@ -13,7 +15,12 @@ app.get("/health", async (c) => {
 	const startTime = Date.now();
 	try {
 		await db.execute(sql`SELECT 1`);
-	} catch {
+	} catch (e) {
+		rootLogger.error(
+			"Health check failed: database unreachable",
+			undefined,
+			externalErrorFromCatch("databaseHealthCheck", e),
+		);
 		return c.json(
 			{
 				status: "unhealthy",
