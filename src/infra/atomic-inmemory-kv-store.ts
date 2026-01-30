@@ -1,12 +1,12 @@
 import lock from "../lib/lock.js";
-import type { KeyValueStore } from "./key-value-store.js";
+import type { AtomicKeyValueStore } from "./key-value-store.js";
 
 type Entry = {
 	value: unknown;
 	expiresAt: number | null;
 };
 
-export class AtomicInMemoryKVStore implements KeyValueStore<Entry> {
+export class AtomicInMemoryKVStore implements AtomicKeyValueStore<unknown> {
 	private store = new Map<string, Entry>();
 	private lock = lock;
 
@@ -14,17 +14,22 @@ export class AtomicInMemoryKVStore implements KeyValueStore<Entry> {
 		return entry.expiresAt !== null && entry.expiresAt <= Date.now();
 	}
 
+	private getEntry(key: string): Entry | null {
+		const entry = this.store.get(key);
+		if (!entry) return null;
+
+		if (this.isExpired(entry)) {
+			this.store.delete(key);
+			return null;
+		}
+
+		return entry;
+	}
+
 	async get<T>(key: string): Promise<T | null> {
 		return this.lock.withLock(() => {
-			const entry = this.store.get(key);
-			if (!entry) return null;
-
-			if (this.isExpired(entry)) {
-				this.store.delete(key);
-				return null;
-			}
-
-			return entry.value as T;
+			const entry = this.getEntry(key);
+			return entry ? (entry.value as T) : null;
 		});
 	}
 
@@ -41,6 +46,23 @@ export class AtomicInMemoryKVStore implements KeyValueStore<Entry> {
 		});
 	}
 
+	async trySet<T>(
+		key: string,
+		value: T,
+		options?: { ttlMs?: number },
+	): Promise<boolean> {
+		return this.lock.withLock(() => {
+			const existing = this.getEntry(key);
+			if (existing) return false;
+
+			const expiresAt =
+				options?.ttlMs != null ? Date.now() + options.ttlMs : null;
+
+			this.store.set(key, { value, expiresAt });
+			return true;
+		});
+	}
+
 	async delete(key: string): Promise<boolean> {
 		return this.lock.withLock(() => {
 			return this.store.delete(key);
@@ -49,37 +71,7 @@ export class AtomicInMemoryKVStore implements KeyValueStore<Entry> {
 
 	async has(key: string): Promise<boolean> {
 		return this.lock.withLock(() => {
-			const entry = this.store.get(key);
-			if (!entry) return false;
-
-			if (this.isExpired(entry)) {
-				this.store.delete(key);
-				return false;
-			}
-
-			return true;
-		});
-	}
-
-	/**
-	 * Atomic update helper (preferred over external CAS loops)
-	 */
-	async update<T>(
-		key: string,
-		fn: (current: T | null) => T,
-		options?: { ttlMs?: number },
-	): Promise<T> {
-		return this.lock.withLock(() => {
-			const entry = this.store.get(key);
-			const current =
-				entry && !this.isExpired(entry) ? (entry.value as T) : null;
-
-			const next = fn(current);
-			const expiresAt =
-				options?.ttlMs != null ? Date.now() + options.ttlMs : null;
-
-			this.store.set(key, { value: next, expiresAt });
-			return next;
+			return this.getEntry(key) !== null;
 		});
 	}
 }
