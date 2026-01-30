@@ -1,5 +1,9 @@
 # Backlog
 - implement repos
+   - create required query and mutation logic
+   - implement db error handler logic
+   - ensure critical sections are wrapped in tx
+- add deps-wiring and use-case initialization
 
 # Doing
 - create use-case implementations (builders)
