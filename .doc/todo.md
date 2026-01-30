@@ -1,4 +1,6 @@
 # Backlog
+- declare confirm logic in IOrderRepo
+- implement repos
 
 # Doing
 - create use-case implementations (builders)
