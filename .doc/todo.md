@@ -2,12 +2,12 @@
 - create use-case implementations (builders)
 
 # Doing
+
+# Done
 - finalize wether we need to model System errors
    - if yes: model it then use it in infra & repo
 - define endpoints schema
 - map domain to http error
-
-# Done
 - model general response format for success and error
 - model use-cases types
 - establish project directory structure
