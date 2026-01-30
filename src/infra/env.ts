@@ -2,6 +2,8 @@
 import z, { ZodError } from "zod";
 import type { ILogger } from "./logger.js";
 import rootLogger from "./pino-logger.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const EnvSchema = z.object({
 	APP_PORT: z.coerce.number(),
@@ -25,7 +27,7 @@ const initEnv = (logger: ILogger) => {
 				error: e,
 			});
 		}
-		process.exit(1);
+      throw Error("Failed to initialize env", { cause: e });
 	}
 };
 
