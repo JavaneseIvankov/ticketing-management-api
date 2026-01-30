@@ -1,11 +1,11 @@
 # Backlog
-- declare confirm logic in IOrderRepo
 - implement repos
 
 # Doing
 - create use-case implementations (builders)
 
 # Done
+- declare confirm logic in IOrderRepo
 - test health-check
 - finalize wether we need to model System errors
    - if yes: model it then use it in infra & repo

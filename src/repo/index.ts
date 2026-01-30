@@ -41,6 +41,11 @@ export interface IOrderRepository {
 			orderId: Order["id"],
 			userId: User["id"],
 		): Promise<Result<void, CancelOrderError>>;
+
+		confirmOrder(
+			orderId: Order["id"],
+			userId: User["id"],
+		): Promise<Result<void, ConfirmOrderError>>;
 	}
 
 type GetOrdersError = ExternalError;
@@ -51,15 +56,24 @@ type GetOrderByIdErorr =
 type CreateOrderError =
 	| PickDomainErrors<"EventClosed" | "InsufficientCapacity">
 	| ExternalError;
-type ExpireOrderError = PickDomainErrors<
-	| "ReservationExpired"
-	| "ReservationCancelled"
-	| "ReservationNotFound"
-	| "NotOwnedReservation"
->;
-type CancelOrderError = PickDomainErrors<
-	"ReservationCancelled" | "ReservationNotFound" | "NotOwnedReservation"
->;
+type ExpireOrderError =
+	| PickDomainErrors<
+			| "ReservationExpired"
+			| "ReservationCancelled"
+			| "ReservationNotFound"
+			| "NotOwnedReservation"
+	  >
+	| ExternalError;
+type CancelOrderError =
+	| PickDomainErrors<
+			"ReservationCancelled" | "ReservationNotFound" | "NotOwnedReservation"
+	  >
+	| ExternalError;
+type ConfirmOrderError =
+	| PickDomainErrors<
+			"ReservationNotFound" | "ReservationExpired" | "ReservationCancelled"
+	  >
+	| ExternalError;
 
 export interface IUserRepository {
 		createUser(
