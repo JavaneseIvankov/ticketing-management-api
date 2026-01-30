@@ -17,7 +17,11 @@ import err, {
 import type { Event, Order, User } from "../domain/model.js";
 import type { AtomicKeyValueStore } from "../infra/key-value-store.js";
 import type { ILogger } from "../infra/logger.js";
-import type { IOrderRepository, IUserRepository } from "../repo/index.js";
+import type {
+	IEventRepository,
+	IOrderRepository,
+	IUserRepository,
+} from "../repo/index.js";
 
 type UseCase<Input, Output> = (input: Input) => Output;
 
@@ -28,12 +32,12 @@ type UseCaseBuilder<Dependencies, Input, Output> = (
 type Builder<Input, Output> = (deps: Input) => Output;
 
 export type ReserveTicketUseCase = UseCase<
-		{
-			eventId: Event["id"];
-			userId: User["id"];
-		},
-		Promise<Result<{ reservationId: string }, ReserveTicketErrors>>
-	>;
+	{
+		eventId: Event["id"];
+		userId: User["id"];
+	},
+	Promise<Result<{ reservationId: string }, ReserveTicketErrors>>
+>;
 
 type ReserveTicketErrors =
 	| PickDomainErrors<
@@ -45,19 +49,86 @@ type ReserveTicketErrors =
 	  >
 	| ExternalError;
 
-const buildReserveTicketUseCase: Builder<
+export type ConfirmReservationUseCase = UseCase<
 	{
-		userRepo: IUserRepository;
-		orderRepo: IOrderRepository;
-		atomicKVStore: AtomicKeyValueStore<{
-			status: "pending" | "completed";
-			reservationId: string;
-		}>;
-		logger: ILogger;
-		idempotencyKeyGenerator: (
-			input: Parameters<ReserveTicketUseCase>[0],
-		) => string;
+		reservationId: string;
 	},
+	Promise<Result<void, ConfirmReservationErrors>>
+>;
+
+type ConfirmReservationErrors =
+	| PickDomainErrors<
+			| "ReservationNotFound"
+			| "ReservationExpired"
+			| "ReservationCancelled"
+			| "InvalidState"
+	  >
+	| ExternalError;
+
+export type CancelReservationUseCase = UseCase<
+	{
+		reservationId: string;
+	},
+	Promise<Result<void, CancelReservationErrors>>
+>;
+
+type CancelReservationErrors =
+	| PickDomainErrors<
+			"ReservationNotFound" | "ReservationCancelled" | "NotOwnedReservation"
+	  >
+	| ExternalError;
+
+export type GetEventsUseCase = UseCase<
+	void,
+	Promise<Result<Event[], GetEventsErrors>>
+>;
+
+type GetEventsErrors = ExternalError;
+
+export type GetEventByIdUseCase = UseCase<
+	{
+		eventId: Event["id"];
+	},
+	Promise<Result<Event, GetEventByIdErrors>>
+>;
+
+type GetEventByIdErrors = PickDomainErrors<"EventNotFound"> | ExternalError;
+
+export type GetReservations = UseCase<
+	void,
+	Promise<Result<Order[], GetReservationsErrors>>
+>;
+
+type GetReservationsErrors = ExternalError;
+
+export type GetReservationById = UseCase<
+	{
+		reservationId: Order["id"];
+	},
+	Promise<Result<Order, GetReservationByIdErrors>>
+>;
+
+type GetReservationByIdErrors =
+	| PickDomainErrors<"ReservationNotFound">
+	| ExternalError;
+
+// Use Case Builders
+
+export type BuildReserveTicketDeps = {
+	userRepo: IUserRepository;
+	orderRepo: IOrderRepository;
+	atomicKVStore: AtomicKeyValueStore<{
+		status: "pending" | "completed";
+		reservationId: string;
+	}>;
+	logger: ILogger;
+	idempotencyKeyGenerator: (
+		input: Parameters<ReserveTicketUseCase>[0],
+	) => string;
+};
+
+export const buildReserveTicketUseCase: Builder<
+	BuildReserveTicketDeps,
 	ReserveTicketUseCase
 > = (deps) => {
 	return async (params) => {
@@ -81,7 +152,7 @@ const buildReserveTicketUseCase: Builder<
 		const orderRes = await orderRepo.createOrder(params.eventId, params.userId);
 
 		if (orderRes.isErr()) {
-			await store.delete(key);
+			store.delete(key); // no need await :p
 			return errResult(orderRes.error);
 		}
 
@@ -96,63 +167,194 @@ const buildReserveTicketUseCase: Builder<
 	};
 };
 
-export type ConfirmReservationUseCase = UseCase<
-		{
-			reservationId: string;
-		},
-		Promise<Result<void, ConfirmReservationErrors>>
-	>;
+type BuildConfirmReservationDeps = {
+	orderRepo: IOrderRepository;
+	logger: ILogger;
+};
 
-type ConfirmReservationErrors =
-	| PickDomainErrors<
-			| "ReservationNotFound"
-			| "ReservationExpired"
-			| "ReservationCancelled"
-			| "InvalidState"
-	  >
-	| ExternalError;
+export const buildConfirmReservationUseCase: Builder<
+	BuildConfirmReservationDeps,
+	ConfirmReservationUseCase
+> = (deps) => {
+	return async (params) => {
+		const { orderRepo, logger } = deps;
 
-export type CancelReservationUseCase = UseCase<
-		{
-			reservationId: string;
-		},
-		Promise<Result<void, CancelReservationErrors>>
-	>;
+		const orderRes = await orderRepo.getOrderById(params.reservationId);
 
-type CancelReservationErrors =
-	| PickDomainErrors<"ReservationNotFound" | "ReservationCancelled">
-	| ExternalError;
+		if (orderRes.isErr()) {
+			return errResult(orderRes.error);
+		}
 
-export type GetEventsUseCase = UseCase<
-		void,
-		Promise<Result<Event[], GetEventsErrors>>
-	>;
+		const order = orderRes.value;
 
-type GetEventsErrors = ExternalError;
+		// Check if already cancelled
+		if (order.meta.cancelledAt) {
+			return errResult(
+				err.ReservationCancelled({
+					reservationId: order.id,
+					cancelledAt: order.meta.cancelledAt.toISOString(),
+				}),
+			);
+		}
 
-export type GetEventByIdUseCase = UseCase<
-		{
-			eventId: Event["id"];
-		},
-		Promise<Result<Event, GetEventByIdErrors>>
-	>;
+		// Check if expired
+		if (order.meta.expiredAt) {
+			return errResult(
+				err.ReservationExpired({
+					reservationId: order.id,
+					expiredAt: order.meta.expiredAt.toISOString(),
+				}),
+			);
+		}
 
-type GetEventByIdErrors = PickDomainErrors<"EventNotFound"> | ExternalError;
+		// Check if already confirmed
+		if (order.meta.confirmedAt) {
+			return errResult(
+				err.InvalidState({
+					resource: `Reservation ${order.id}`,
+					expected: "PENDING",
+					actual: "CONFIRMED",
+				}),
+			);
+		}
 
-export type GetReservations = UseCase<
-		void,
-		Promise<Result<Order[], GetReservationsErrors>>
-	>;
+		// TODO: Implement confirm logic in repository
+		logger.info("Confirming reservation", { reservationId: order.id });
 
-type GetReservationsErrors = ExternalError;
+		return okResult(undefined);
+	};
+};
 
-export type GetReservationById = UseCase<
-		{
-			reservationId: Order["id"];
-		},
-		Promise<Result<Order, GetReservationByIdErrors>>
-	>;
+export type BuildCancelReservationDeps = {
+	orderRepo: IOrderRepository;
+	logger: ILogger;
+};
 
-type GetReservationByIdErrors =
-	| PickDomainErrors<"ReservationNotFound">
-	| ExternalError;
+export const buildCancelReservationUseCase: Builder<
+	BuildCancelReservationDeps,
+	CancelReservationUseCase
+> = (deps) => {
+	return async (params) => {
+		const { orderRepo, logger } = deps;
+
+		const orderRes = await orderRepo.getOrderById(params.reservationId);
+
+		if (orderRes.isErr()) {
+			return errResult(orderRes.error);
+		}
+
+		const order = orderRes.value;
+
+		// Check if already cancelled
+		if (order.meta.cancelledAt) {
+			return errResult(
+				err.ReservationCancelled({
+					reservationId: order.id,
+					cancelledAt: order.meta.cancelledAt.toISOString(),
+				}),
+			);
+		}
+
+		// Cancel the reservation
+		const cancelRes = await orderRepo.cancelOrder(
+			order.id,
+			order.userId, // In real scenario, this would come from authenticated user context
+		);
+
+		if (cancelRes.isErr()) {
+			return errResult(cancelRes.error);
+		}
+
+		logger.info("Reservation cancelled", { reservationId: order.id });
+
+		return okResult(undefined);
+	};
+};
+
+export type BuildGetEventsUseCaseDeps = {
+	eventRepo: IEventRepository;
+	logger: ILogger;
+};
+
+export const buildGetEventsUseCase: Builder<
+	BuildGetEventsUseCaseDeps,
+	GetEventsUseCase
+> = (deps) => {
+	return async () => {
+		const { eventRepo } = deps;
+
+		const eventsRes = await eventRepo.getEvents();
+
+		if (eventsRes.isErr()) {
+			return errResult(eventsRes.error);
+		}
+
+		return okResult(eventsRes.value);
+	};
+};
+
+export type BuildGetEventByIdUseCaseDeps = {
+	eventRepo: IEventRepository;
+	logger: ILogger;
+};
+
+export const buildGetEventByIdUseCase: Builder<
+	BuildGetEventByIdUseCaseDeps,
+	GetEventByIdUseCase
+> = (deps) => {
+	return async (params) => {
+		const { eventRepo } = deps;
+
+		const eventRes = await eventRepo.getEventById(params.eventId);
+
+		if (eventRes.isErr()) {
+			return errResult(eventRes.error);
+		}
+
+		return okResult(eventRes.value);
+	};
+};
+
+export type BuildGetReservationsDeps = {
+	orderRepo: IOrderRepository;
+	logger: ILogger;
+};
+
+export const buildGetReservations: Builder<
+	BuildGetReservationsDeps,
+	GetReservations
+> = (deps) => {
+	return async () => {
+		const { orderRepo } = deps;
+
+		const ordersRes = await orderRepo.getOrders();
+
+		if (ordersRes.isErr()) {
+			return errResult(ordersRes.error);
+		}
+
+		return okResult(ordersRes.value);
+	};
+};
+
+export type BuildGetReservationByIdDeps = {
+	orderRepo: IOrderRepository;
+	logger: ILogger;
+};
+
+export const buildGetReservationById: Builder<
+	BuildGetReservationByIdDeps,
+	GetReservationById
+> = (deps) => {
+	return async (params) => {
+		const { orderRepo } = deps;
+
+		const orderRes = await orderRepo.getOrderById(params.reservationId);
+
+		if (orderRes.isErr()) {
+			return errResult(orderRes.error);
+		}
+
+		return okResult(orderRes.value);
+	};
+};
