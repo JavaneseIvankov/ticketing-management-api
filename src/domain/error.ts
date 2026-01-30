@@ -1,70 +1,105 @@
-export type DomainError =
-	| EventNotFound
-	| ReservationNotFound
-	| NotOwnedReservation
-	| EventClosed
-	| InsufficientCapacity
-	| ReservationExpired
-	| ReservationCancelled
-	| DuplicateRequest
-	| InvalidState
-	| UserAlreadyExists;
+import { createErrorFactories, type InferErrors } from "../lib/error-lib.js";
 
-type TaggedError<T extends string, Ext extends Record<string, unknown>> = {
-	_tag: T;
-	message?: string;
-} & Ext;
 
-export type EventNotFound = TaggedError<"EventNotFound", { eventId: string }>;
+export type {
+	ExternalError,
+	UnexpectedError,
+} from "../lib/error-lib.js";
+export {
+	externalErrorFromCatch,
+	unexpectedErrorFromCatch,
+} from "../lib/error-lib.js";
 
-export type ReservationNotFound = TaggedError<
-	"ReservationNotFound",
-	{ reservationId: string }
+export type DomainErrors = InferErrors<typeof domainErrorFactories>;
+export type DomainErrorTags = DomainErrors["_tag"];
+export type PickDomainErrors<TTags extends DomainErrorTags> = Extract<
+	DomainErrors,
+	{ _tag: TTags }
 >;
 
-export type NotOwnedReservation = TaggedError<
-	"NotOwnedReservation",
-	{ reservationId: string; userId: string }
->;
+const domainErrorFactories = createErrorFactories({
+	EventNotFound: ({ eventId }: { eventId: string }) =>
+		`Event with ID '${eventId}' not found`,
 
-export type EventClosed = TaggedError<
-	"EventClosed",
-	{ eventId: string; closedAt?: string }
->;
+	ReservationNotFound: ({ reservationId }: { reservationId: string }) =>
+		`Reservation with ID '${reservationId}' not found`,
 
-export type InsufficientCapacity = TaggedError<
-	"InsufficientCapacity",
-	{ eventId: string; requested: number; available: number }
->;
+	NotOwnedReservation: ({
+		reservationId,
+		userId,
+	}: {
+		reservationId: string;
+		userId: string;
+	}) => `Reservation '${reservationId}' does not belong to user '${userId}'`,
 
-export type ReservationExpired = TaggedError<
-	"ReservationExpired",
-	{ reservationId: string; expiredAt?: string }
->;
+	EventClosed: ({
+		eventId,
+		closedAt,
+	}: {
+		eventId: string;
+		closedAt?: string;
+	}) =>
+		closedAt
+			? `Event '${eventId}' was closed at ${closedAt}`
+			: `Event '${eventId}' is closed for reservations`,
 
-export type ReservationCancelled = TaggedError<
-	"ReservationCancelled",
-	{ reservationId: string; cancelledAt?: string }
->;
+	InsufficientCapacity: ({
+		eventId,
+		requested,
+		available,
+	}: {
+		eventId: string;
+		requested: number;
+		available: number;
+	}) =>
+		`Event '${eventId}': insufficient capacity (requested: ${requested}, available: ${available})`,
 
-export type DuplicateRequest = TaggedError<
-	"DuplicateRequest",
-	{ requestId: string }
->;
+	ReservationExpired: ({
+		reservationId,
+		expiredAt,
+	}: {
+		reservationId: string;
+		expiredAt?: string;
+	}) =>
+		expiredAt
+			? `Reservation '${reservationId}' expired at ${expiredAt}`
+			: `Reservation '${reservationId}' has expired`,
 
-export type InvalidState = TaggedError<
-	"InvalidState",
-	{
+	ReservationCancelled: ({
+		reservationId,
+		cancelledAt,
+	}: {
+		reservationId: string;
+		cancelledAt?: string;
+	}) =>
+		cancelledAt
+			? `Reservation '${reservationId}' was cancelled at ${cancelledAt}`
+			: `Reservation '${reservationId}' was cancelled`,
+
+	DuplicateRequest: ({ requestId }: { requestId: string }) =>
+		`Duplicate request detected: '${requestId}'`,
+
+	InvalidState: ({
+		resource,
+		expected,
+		actual,
+	}: {
 		resource: string;
 		expected?: string;
 		actual?: string;
-	}
->;
+	}) =>
+		expected && actual
+			? `Resource '${resource}' is in invalid state (expected: ${expected}, actual: ${actual})`
+			: `Resource '${resource}' is in an invalid state`,
 
-export type UserAlreadyExists = TaggedError<
-	"UserAlreadyExists",
-	{ email: string }
->;
+	UserAlreadyExists: ({ email }: { email: string }) =>
+		`User with email '${email}' already exists`,
 
-export type UserNotFound<E extends { email: string } | { userId: string }> =
-	TaggedError<"UserNotFound", E>;
+	UserNotFoundByEmail: ({ email }: { email: string }) =>
+		`User with email '${email}' not found`,
+
+	UserNotFoundById: ({ userId }: { userId: string }) =>
+		`User with ID '${userId}' not found`,
+});
+
+export default domainErrorFactories;

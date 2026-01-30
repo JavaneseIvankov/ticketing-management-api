@@ -10,7 +10,7 @@ Responsibility:
 */
 
 import type { ResultAsync } from "neverthrow";
-import type { DomainError } from "../domain/error.js";
+import type { ExternalError, PickDomainErrors } from "../domain/error.js";
 import type { Event, Order, User } from "../domain/model.js";
 
 type UseCase<Input, Output> = (input: Input) => Output;
@@ -20,45 +20,80 @@ type UseCaseBuilder<Dependencies, Input, Output> = (
 ) => UseCase<Input, Output>;
 
 export type ReserveTicketUseCase = UseCase<
-	{
-		eventId: Event["id"];
-		userId: User["id"];
-	},
-	// FIXME: refine error types
-	ResultAsync<{ reservationId: string }, DomainError>
->;
+		{
+			eventId: Event["id"];
+			userId: User["id"];
+		},
+		ResultAsync<{ reservationId: string }, ReserveTicketErrors>
+	>;
+
+type ReserveTicketErrors =
+	| PickDomainErrors<
+			| "EventNotFound"
+			| "UserNotFoundById"
+			| "EventClosed"
+			| "InsufficientCapacity"
+			| "DuplicateRequest"
+	  >
+	| ExternalError;
 
 export type ConfirmReservationUseCase = UseCase<
-	{
-		reservationId: string;
-	},
-	// FIXME: refine error types
-	ResultAsync<void, DomainError>
->;
+		{
+			reservationId: string;
+		},
+		ResultAsync<void, ConfirmReservationErrors>
+	>;
+
+type ConfirmReservationErrors =
+	| PickDomainErrors<
+			| "ReservationNotFound"
+			| "ReservationExpired"
+			| "ReservationCancelled"
+			| "InvalidState"
+	  >
+	| ExternalError;
 
 export type CancelReservationUseCase = UseCase<
-	{
-		reservationId: string;
-	},
-	ResultAsync<void, DomainError>
+		{
+			reservationId: string;
+		},
+		ResultAsync<void, CancelReservationErrors>
+	>;
+
+type CancelReservationErrors =
+	| PickDomainErrors<"ReservationNotFound" | "ReservationCancelled">
+	| ExternalError;
+
+export type GetEventsUseCase = UseCase<
+	void,
+	ResultAsync<Event[], GetEventsErrors>
 >;
 
-export type GetEventsUseCase = UseCase<void, ResultAsync<Event[], DomainError>>;
+type GetEventsErrors = ExternalError;
 
 export type GetEventByIdUseCase = UseCase<
-	{
-		eventId: Event["id"];
-	},
-	// FIXME: refine error types
-	ResultAsync<Event, DomainError>
+		{
+			eventId: Event["id"];
+		},
+		ResultAsync<Event, GetEventByIdErrors>
+	>;
+
+type GetEventByIdErrors = PickDomainErrors<"EventNotFound"> | ExternalError;
+
+export type GetReservations = UseCase<
+	void,
+	ResultAsync<Order[], GetReservationsErrors>
 >;
 
-export type GetReservations = UseCase<void, ResultAsync<Order[], DomainError>>;
+type GetReservationsErrors = ExternalError;
 
 export type GetReservationById = UseCase<
-	{
-		reservationId: Order["id"];
-	},
-	// FIXME: refine error types
-	ResultAsync<Order, DomainError>
->;
+		{
+			reservationId: Order["id"];
+		},
+		ResultAsync<Order, GetReservationByIdErrors>
+	>;
+
+type GetReservationByIdErrors =
+	| PickDomainErrors<"ReservationNotFound">
+	| ExternalError;
