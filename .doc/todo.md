@@ -1,9 +1,10 @@
 # Backlog
-- create use-case implementations (builders)
 
 # Doing
+- create use-case implementations (builders)
 
 # Done
+- test health-check
 - finalize wether we need to model System errors
    - if yes: model it then use it in infra & repo
 - define endpoints schema
